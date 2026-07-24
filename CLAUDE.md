@@ -56,7 +56,11 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
-## Working Style
+## 5. No Em-Dashes or En-Dashes
+
+**Never use em-dashes (—) or en-dashes (–) in anything you write.** UI copy, docs, code comments, commit messages, PR descriptions, chat replies: all of it. Rephrase with a period, comma, or colon instead. When editing existing text, replace any you touch the same way. True minus signs (−) in numeric contexts are not dashes; leave them alone.
+
+## 6. Working Style
 
 Distilled from Fable 5's way of working — the communication and discipline habits that transfer across models. Applies to every model and every project.
 
