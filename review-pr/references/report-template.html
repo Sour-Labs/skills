@@ -1,0 +1,262 @@
+<!doctype html>
+<!--
+  review-pr report template.
+  HOW TO USE (for the assembling agent):
+  - Copy this file to $REPORT_DIR/index.html, then replace every «SLOT:...» marker and
+    the example blocks (marked EXAMPLE — DELETE) with real content. Nothing else needs
+    editing; keep the <head>, styles, and scripts as they are.
+  - All data must be INLINED (findings, code, diff text, mermaid sources). fetch() of
+    sibling files does not work from file://. Screenshots are the exception: relative
+    <img src="assets/..."> paths DO work.
+  - Escaping rules:
+      * Inside normal HTML / <pre><code>: escape & < > .
+      * Inside <script type="text/x-diff"> carriers: paste the RAW diff, escaping only
+        the sequence </script> as <\/script>. Do not HTML-escape there.
+      * Mermaid sources go in <pre class="mermaid"> blocks: escape & < > (mermaid reads
+        textContent, so HTML entities are safe and required, e.g. - -> becomes &gt;&gt;).
+  - CDN scripts (mermaid, highlight.js, diff2html, slider) were verified to load from
+    file:// in Chrome. Offline, the page degrades gracefully: code and diagram sources
+    stay readable as plain text. If the default browser misbehaves, suggest
+    `open -a "Google Chrome" index.html`.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>«SLOT:PR_TITLE» · PR #«SLOT:PR_NUMBER» review</title>
+
+<link rel="stylesheet" media="(prefers-color-scheme: light)"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css">
+<link rel="stylesheet" media="(prefers-color-scheme: dark)"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/diff2html@3.4.55/bundles/css/diff2html.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/diff2html@3.4.55/bundles/js/diff2html-ui.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/img-comparison-slider@8/dist/index.js"></script>
+
+<style>
+  :root { color-scheme: light dark;
+    --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0; --accent:#0969da;
+    --card:#f6f8fa; --red:#d1242f; --red-bg:#ffebe9; --orange:#9a6700; --orange-bg:#fff8c5;
+    --blue:#0969da; --blue-bg:#ddf4ff; --gray:#59636e; --gray-bg:#f6f8fa;
+    --green:#1a7f37; --green-bg:#dafbe1; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d; --accent:#4493f8;
+      --card:#161b22; --red:#ff7b72; --red-bg:#490202; --orange:#e3b341; --orange-bg:#3b2e00;
+      --blue:#79c0ff; --blue-bg:#0c2d6b; --gray:#9198a1; --gray-bg:#161b22;
+      --green:#56d364; --green-bg:#04260f; } }
+  * { box-sizing: border-box; }
+  body { margin:0 auto; max-width:1080px; padding:24px 32px 96px; background:var(--bg); color:var(--fg);
+    font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  h1 { font-size:1.6em; line-height:1.25; margin-bottom:4px; }
+  h2 { line-height:1.25; border-bottom:1px solid var(--border); padding-bottom:.3em; margin-top:2.2em; }
+  h3 { line-height:1.25; margin-top:1.6em; }
+  code, pre { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:85%; }
+  code { background:var(--card); padding:.15em .35em; border-radius:5px; }
+  pre { overflow-x:auto; padding:12px; border:1px solid var(--border); border-radius:8px; background:var(--card); }
+  pre code { background:transparent; padding:0; font-size:100%; }
+  img { max-width:100%; }
+  a { color:var(--accent); }
+  .muted { color:var(--muted); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0; padding:0; list-style:none; font-size:13px; }
+  .chips li { border:1px solid var(--border); border-radius:999px; padding:2px 12px; background:var(--card); }
+  .chips li.ok { color:var(--green); } .chips li.bad { color:var(--red); }
+  nav.toc { position:sticky; top:0; z-index:5; display:flex; gap:18px; padding:10px 0; margin-top:18px;
+    background:var(--bg); border-bottom:1px solid var(--border); font-size:14px; }
+  .callout { border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:8px;
+    padding:14px 18px; background:var(--card); margin:18px 0; }
+  .callout.tldr { font-size:1.08em; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:800px) { .grid2 { grid-template-columns:1fr; } }
+  .mermaid { display:flex; justify-content:center; background:var(--card); }
+  figure.shots { display:flex; flex-wrap:wrap; gap:16px; margin:16px 0; align-items:flex-start; }
+  figure.shots > div { text-align:center; }
+  .shot-label { font-size:13px; font-weight:600; color:var(--muted); margin-bottom:6px;
+    text-transform:uppercase; letter-spacing:.04em; }
+  figure.shots img { width:300px; border-radius:12px; border:1px solid var(--border); }
+  /* add class="shots wide" for desktop/browser captures instead of phone-width ones */
+  figure.shots.wide img { width:min(100%, 520px); }
+  figure.shots figcaption { flex-basis:100%; font-size:14px; color:var(--muted); }
+  .badge { display:inline-block; font-size:12px; font-weight:600; padding:1px 10px; border-radius:999px; }
+  .badge.blocking  { color:var(--red);    background:var(--red-bg); }
+  .badge.should-fix{ color:var(--orange); background:var(--orange-bg); }
+  .badge.question  { color:var(--blue);   background:var(--blue-bg); }
+  .badge.nit       { color:var(--gray);   background:var(--gray-bg); border:1px solid var(--border); }
+  .badge.praise    { color:var(--green);  background:var(--green-bg); }
+  .finding { border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin:14px 0; }
+  .finding .loc { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
+  .finding .loc button { font-size:11px; margin-left:8px; cursor:pointer; border:1px solid var(--border);
+    border-radius:6px; background:var(--card); color:var(--muted); padding:1px 8px; }
+  .finding .comment { margin:10px 0 4px; white-space:pre-wrap; }
+  details { margin:10px 0; } summary { cursor:pointer; color:var(--muted); }
+  .d2h-wrapper { margin-top:8px; }
+  footer { margin-top:64px; padding-top:16px; border-top:1px solid var(--border);
+    font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- ============================== HEADER ============================== -->
+<header>
+  <div class="muted" style="font-size:14px">«SLOT:REPO» · <a href="«SLOT:PR_URL»">#«SLOT:PR_NUMBER»</a>
+    · «SLOT:AUTHOR» · <code>«SLOT:HEAD_BRANCH»</code> → <code>«SLOT:BASE_BRANCH»</code></div>
+  <h1>«SLOT:PR_TITLE»</h1>
+  <ul class="chips">
+    <li>«SLOT:CHANGED_FILES» files</li>
+    <li><span style="color:var(--green)">+«SLOT:ADDITIONS»</span> / <span style="color:var(--red)">−«SLOT:DELETIONS»</span></li>
+    <li class="«SLOT:CI_CLASS ok|bad»">CI: «SLOT:CI_SUMMARY»</li>
+    <li>Review effort: «SLOT:EFFORT 1-5»/5</li>
+    <li class="muted">«SLOT:PR_STATE draft/open»</li>
+  </ul>
+  <nav class="toc">
+    <a href="#explanation">Explanation</a>
+    <a href="#screenshots">Screenshots</a>
+    <a href="#review">Review («SLOT:FINDING_COUNT»)</a>
+    <a href="#coverage">Coverage</a>
+  </nav>
+</header>
+
+<!-- ============================ EXPLANATION =========================== -->
+<section id="explanation">
+  <div class="callout tldr"><strong>TL;DR</strong> — «SLOT:TLDR 2-3 plain-language sentences»</div>
+
+  <h2>Why</h2>
+  «SLOT:WHY — short prose; say when motivation is inferred rather than stated»
+
+  <h2>What changed</h2>
+  «SLOT:WHAT_CHANGED — prose + optional bullets: modules/layers touched, new/modified/
+   deleted types, behavior changes, feature-flag or config gating. A small mermaid graph
+   of module/type relationships can live here when it genuinely clarifies.»
+
+  <h2>How it works</h2>
+  «SLOT:HOW_IT_WORKS — prose walking the main flow(s). Include 1-3 mermaid diagrams only
+   where a diagram beats prose. EXAMPLE — DELETE:»
+  <pre class="mermaid">
+sequenceDiagram
+  participant UI as ProfileScreen
+  participant VM as ProfileViewModel
+  UI-&gt;&gt;VM: handleAction(LoadProfile)
+  VM--&gt;&gt;UI: state.copy(loading=false)
+  </pre>
+
+  <h2>Walkthrough</h2>
+  «SLOT:WALKTHROUGH — group files by concern, ordered by dependency (models → business
+   logic → call sites → UI → tests), never alphabetically. Per group: 2-3 sentence
+   summary; for the 3-6 most important changes a short highlighted snippet or a diff.
+   Collapse per-file detail in <details> when a group exceeds ~8 files.
+   Code snippet pattern: <pre><code class="language-«lang»">…escaped…</code></pre>
+   where «lang» is the file's highlight.js language (ts, tsx, kotlin, swift, python, go…).
+   Diff pattern (EXAMPLE — DELETE):»
+  <script type="text/x-diff" id="diff-example">diff --git a/Example.ts b/Example.ts
+index 0000001..0ddf2ba 100644
+--- a/Example.ts
++++ b/Example.ts
+@@ -1,3 +1,4 @@
+ export function createProfileStore(
+-  repo: ProfileRepository
++  repo: ProfileRepository,
++  tracker: ProfileTracker,
+ )</script>
+  <div class="diff" data-diff="diff-example"></div>
+
+  <h2>Risk map</h2>
+  «SLOT:RISK_MAP — 2-5 bullets: what to scrutinize hardest, what is mechanical.»
+</section>
+
+<!-- ============================ SCREENSHOTS =========================== -->
+<section id="screenshots">
+  <h2>Visual changes</h2>
+  «SLOT:SCREENSHOTS - one figure.shots per screen from assets/screens.json. Use
+   class="shots wide" when the manifest's viewport is a desktop/browser size, plain
+   class="shots" for phone-width captures. Omit the whole section (including the toc
+   link) for non-UI PRs or --no-screenshots, replacing it with one muted line saying why.
+   For a brand-new screen, single "After (new screen)" column. Note the feature-flag
+   state from the manifest in the caption when relevant. EXAMPLE - DELETE:»
+  <figure class="shots wide">
+    <div><div class="shot-label">Before</div>
+      <a href="assets/checkout-summary/before.png" target="_blank"><img src="assets/checkout-summary/before.png" alt="Before"></a></div>
+    <div><div class="shot-label">After</div>
+      <a href="assets/checkout-summary/after.png" target="_blank"><img src="assets/checkout-summary/after.png" alt="After"></a></div>
+    <figcaption>Checkout summary at 1440x900: line-item spacing and the new tax
+      breakdown row. Flag <code>new_checkout_summary=on</code> (after only).</figcaption>
+  </figure>
+  <!-- For subtle pixel-level tweaks an overlay slider may be added AFTER the pair:
+  <img-comparison-slider style="width:300px">
+    <img slot="first" src="assets/x/before.png" style="width:100%">
+    <img slot="second" src="assets/x/after.png" style="width:100%">
+  </img-comparison-slider> -->
+</section>
+
+<!-- ============================== REVIEW ============================== -->
+<section id="review">
+  <h2>Review</h2>
+  <p>«SLOT:REVIEW_SUMMARY — e.g. "2 blocking · 3 suggestions · 1 question · 1 nit · 1
+    praise" and a one-sentence overall verdict in plain language. If nothing survived
+    verification, say "No significant issues found" and show only praise/notes.»</p>
+
+  «SLOT:FINDINGS — one .finding card per confirmed finding, ordered blocking →
+   should-fix → question → nit → praise. Badge class = severity. The comment text is
+   the conventional-comment phrasing, ready to paste to GitHub. Include a suggested-fix
+   snippet and/or a relevant diff carrier inside <details> when it helps.
+   EXAMPLE — DELETE:»
+  <div class="finding">
+    <span class="badge blocking">blocking</span>
+    <span class="loc">src/checkout/useSummary.ts:142
+      <button onclick="copyLoc(this)" data-loc="src/checkout/useSummary.ts:142">copy</button></span>
+    <div class="comment">issue (blocking): `searchTerm` goes into the query string unencoded, so a value containing `&` silently drops every filter after it. Encoding the term would fix it.</div>
+    <details><summary>Suggested fix</summary>
+      <pre><code class="language-ts">const url = `/api/items?q=${encodeURIComponent(searchTerm)}`;</code></pre>
+    </details>
+  </div>
+
+  «SLOT:OVERFLOW — if more than ~12 findings, a <details> block listing the rest as
+   one-liners (badge + loc + first sentence). Omit when not needed.»
+</section>
+
+<!-- ============================= COVERAGE ============================= -->
+<section id="coverage">
+  <h2>Coverage &amp; caveats</h2>
+  <ul>
+    <li>«SLOT:PROFILE - detected project profile(s) and the house-rule docs the reviewers
+      read, e.g. "web (Next.js) · CONTRIBUTING.md, .cursor/rules/ui.md".»</li>
+    <li>«SLOT:FILES_REVIEWED» files reviewed; «SLOT:FILES_EXCLUDED» excluded (generated/translations/lockfiles).</li>
+    <li>«SLOT:ATTRITION — e.g. "17 candidate findings → 9 after dedup → 6 confirmed by verification (3 killed as false positives, N already raised by human reviewers)."»</li>
+    <li>«SLOT:SCREENS_COVERAGE — screens captured vs skipped, with reasons from screens.json; or why screenshots were skipped entirely.»</li>
+    <li>«SLOT:CAVEATS — anything not exercised: flows not driven, base build failure, unreachable states. Honesty here is what makes the rest trustworthy.»</li>
+  </ul>
+</section>
+
+<footer>
+  Generated by <code>/review-pr</code> · «SLOT:DATE» · head <a href="«SLOT:HEAD_COMMIT_URL»"><code>«SLOT:HEAD_SHA_SHORT»</code></a>
+  · This report is local and may contain company code — don't publish it.
+</footer>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+<script>
+  hljs.highlightAll();
+  document.querySelectorAll('div.diff[data-diff]').forEach(el => {
+    const carrier = document.getElementById(el.dataset.diff);
+    if (!carrier) return;
+    new Diff2HtmlUI(el, carrier.textContent, {
+      drawFileList: false, matching: 'lines', outputFormat: 'line-by-line',
+      highlight: true, colorScheme: 'auto',
+    }).draw();
+  });
+  function copyLoc(btn) {
+    const text = btn.dataset.loc;
+    (navigator.clipboard ? navigator.clipboard.writeText(text)
+      : Promise.reject()).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        document.execCommand('copy'); ta.remove();
+      });
+    btn.textContent = 'copied'; setTimeout(() => btn.textContent = 'copy', 1200);
+  }
+</script>
+</body>
+</html>
