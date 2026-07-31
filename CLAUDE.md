@@ -61,9 +61,25 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 
-## 5. No Em-Dashes or En-Dashes
+## 5. Dashes
 
-**Never use em-dashes (—) or en-dashes (–) in anything you write.** UI copy, docs, code comments, commit messages, PR descriptions, chat replies: all of it. Rephrase with a period, comma, or colon instead. When editing existing text, replace any you touch the same way. True minus signs (−) in numeric contexts are not dashes; leave them alone.
+**Never use an em-dash (—). Use an en-dash (–) only for ranges and paired names.**
+
+The em-dash is the clearest sign of AI-written text. Replace it with a period, comma, colon, or parentheses. This applies to every text you author: chat replies, UI copy, docs, code comments, commit messages, PR descriptions.
+
+Keep the en-dash where it is correct typography:
+- Ranges of numbers, dates, and times: 10–20, 2020–2024, Mon–Fri. A hyphen is also acceptable.
+- Paired names: client–server, Kruskal–Wallis test.
+
+Do not use an en-dash as a sentence connector (` – like this `). It reads the same as an em-dash.
+
+Both dashes are allowed in these two cases:
+- Text you copy instead of author: quotations, existing file content, user-supplied strings, test fixtures, data, URLs, and file names. Keep these exact.
+- Files that only AI reads: memory files, agent prompts, plan notes, scratch files.
+
+When you edit existing text, remove em-dashes only from lines you change for another reason. Do not open a file only to remove dashes.
+
+A minus sign (−) in a numeric context is not a dash. Leave it alone.
 
 
 ## 6. Working Style
